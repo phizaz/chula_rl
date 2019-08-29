@@ -105,7 +105,7 @@ class Gridworld(Env):
 
     def render(self, mode='human'):
         assert mode == 'human'
-        fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+        fig, axes = plt.subplots(1, 2, figsize=(4, 2))
         self._print_physical(axes[0])
         self._print_reward(axes[1])
 

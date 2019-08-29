@@ -60,7 +60,7 @@ def evaluate(policy: BasePolicy, env: gym.Env, n_eval_interaction: int):
         except InteractionExceeded:
             break
     # average the returns
-    stats = explorer.get_stats()['stats']
+    stats = explorer.get_stats()['history']
     returns = np.array(stats['reward'])
     return {
         'reward': returns.mean(),

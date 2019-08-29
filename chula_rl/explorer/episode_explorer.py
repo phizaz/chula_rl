@@ -22,7 +22,7 @@ class EpisodeExplorer(BaseExplorer):
     def step(self, policy: BasePolicy):
         data = defaultdict(list)
         while True:
-            if self.n_interaction > self.n_max_interaction:
+            if self.n_interaction >= self.n_max_interaction:
                 raise InteractionExceeded()
 
             # explore

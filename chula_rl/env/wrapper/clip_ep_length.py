@@ -1,12 +1,8 @@
-"""
-taken from https://github.com/MillionIntegrals/vel
-"""
 import gym
 
 
 class ClipEpisodeLength(gym.Wrapper):
     """ Env wrapper that clips number of frames an episode can last """
-
     def __init__(self, env, n_max_length):
         super().__init__(env)
 
@@ -21,7 +17,7 @@ class ClipEpisodeLength(gym.Wrapper):
         self.i_step += 1
         s, r, done, info = self.env.step(action)
 
-        if self.i_step > self.n_max_length:
+        if self.i_step >= self.n_max_length:
             done = True
             info['clipped_length'] = True
 
