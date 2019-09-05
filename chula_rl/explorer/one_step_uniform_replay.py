@@ -4,6 +4,7 @@ import numpy as np
 
 
 class OneStepUniformReplay(BaseReplay):
+    """a wrapper for one-step explorer, this will put the experience into a database, then samples as a return"""
     def __init__(self, explorer, n_sample, n_max_size, obs_space: gym.Space,
                  act_space: gym.Space):
         super().__init__(explorer)

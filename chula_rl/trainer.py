@@ -59,6 +59,7 @@ def train(explorer: BaseExplorer,
                 # train
                 call_cb('before_optimize', kwargs({'data': data}), callbacks)
                 if data is not None:
+                    # no data, skip optimization
                     policy.optimize_step(data)
                 call_cb('after_optimize', kwargs({'data': data}), callbacks)
                 progress.update(explorer.n_interaction - progress.n)
@@ -77,6 +78,7 @@ def train(explorer: BaseExplorer,
 
 
 class ExplorerStatsCb(StatsCallback):
+    """log explorer's rewards"""
     def __init__(self, n_log_cycle):
         super().__init__(n_log_cycle)
 

@@ -4,6 +4,7 @@ import pandas as pd
 
 
 class BaseCallback:
+    """callback is a way to inject a piece of code into the training loop at each stage"""
     def before_start(self, **kwargs):
         pass
 

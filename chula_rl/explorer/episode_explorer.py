@@ -10,6 +10,7 @@ from .base_explorer import BaseExplorer
 
 
 class EpisodeExplorer(BaseExplorer):
+    """explore for an episode"""
     def __init__(self, n_max_interaction: int, env: gym.Env):
         super().__init__(env)
         self.n_max_interaction = n_max_interaction

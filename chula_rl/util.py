@@ -47,6 +47,7 @@ def reindex(src, tgt):
 
 
 def plot_std(ax, group_df, y):
+    """plot results with mean and std"""
     mean = group_df.agg({y: 'mean'})
     std = group_df.agg({y: 'std'})
     ax.plot(mean)
@@ -63,6 +64,7 @@ def t_div(data, confidence=0.95, ddof=None):
 
 
 def plot_conf(ax, group_df, y, confidence: float = 0.95):
+    """plot results with mean and confidence interval"""
     mean = group_df.agg({y: 'mean'})
     div = group_df.agg({y: partial(t_div, confidence=confidence)})
     ax.plot(mean)
@@ -70,6 +72,7 @@ def plot_conf(ax, group_df, y, confidence: float = 0.95):
 
 
 def parallel_map(fn, list_of_args):
+    """run fn parallelly"""
     with mp.Pool() as pool:
         out = []
         with tqdm(total=len(list_of_args)) as progress:
