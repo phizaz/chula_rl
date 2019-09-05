@@ -13,6 +13,17 @@ def set_seed(seed: int):
     np.random.seed(seed)
 
 
+def tup(x):
+    if isinstance(x, (tuple, list, np.ndarray)):
+        return tuple(x)
+    else:
+        return (x, )
+
+
+def tup_sa(s, a):
+    return tup(s) + tup(a)
+
+
 def reindex(src, tgt):
     """duplicate rows to make sure that n_interaction is the same as tgt dataframe.
     this is useful for monte carlo methods where the n_interaction column comes in irregular intervals.
@@ -38,6 +49,7 @@ def reindex(src, tgt):
 def plot_std(ax, group_df, y):
     mean = group_df.agg({y: 'mean'})
     std = group_df.agg({y: 'std'})
+    ax.plot(mean)
     ax.fill_between(mean.index, mean[y] - std[y], mean[y] + std[y], alpha=0.07)
 
 
@@ -53,6 +65,7 @@ def t_div(data, confidence=0.95, ddof=None):
 def plot_conf(ax, group_df, y, confidence: float = 0.95):
     mean = group_df.agg({y: 'mean'})
     div = group_df.agg({y: partial(t_div, confidence=confidence)})
+    ax.plot(mean)
     ax.fill_between(mean.index, mean[y] - div[y], mean[y] + div[y], alpha=0.07)
 
 
