@@ -1,6 +1,3 @@
-"""
-based on: https://github.com/suragnair/alpha-zero-general
-"""
 import time
 
 import numpy as np

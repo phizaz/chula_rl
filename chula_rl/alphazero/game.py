@@ -1,8 +1,3 @@
-"""
-based on: https://github.com/suragnair/alpha-zero-general
-"""
-
-
 class Game:
     """
     This class specifies the base Game class. To define your own game, subclass
