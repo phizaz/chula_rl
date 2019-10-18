@@ -1,6 +1,3 @@
-"""
-based on: https://github.com/suragnair/alpha-zero-general
-"""
 '''
 Author: Eric P. Nichols
 Date: Feb 8, 2008.

@@ -1,7 +1,3 @@
-"""
-based on: https://github.com/suragnair/alpha-zero-general
-"""
-
 from ..game import Game
 from .logic import Board
 import numpy as np

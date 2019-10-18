@@ -1,7 +1,3 @@
-"""
-based on: https://github.com/suragnair/alpha-zero-general
-"""
-
 import numpy as np
 
 
