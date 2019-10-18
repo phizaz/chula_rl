@@ -12,7 +12,11 @@ from chula_rl.alphazero.net import Net
 
 
 class SantoriniNet(Net):
-    def __init__(self, game: Game, args: NetArgs):
+    """
+    Args:
+        args: in case you want to configure the network somehow
+    """
+    def __init__(self, game: Game, args):
         self.args = args
         self.nnet = Backbone(game, args)
         self.board_x, self.board_y = game.getBoardSize()
