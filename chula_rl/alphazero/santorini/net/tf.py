@@ -11,7 +11,7 @@ from chula_rl.alphazero.game import Game
 from chula_rl.alphazero.net import Net
 
 
-class OthelloNet(Net):
+class SantoriniNet(Net):
     def __init__(self, game: Game, args: NetArgs):
         self.args = args
         self.nnet = Backbone(game, args)
