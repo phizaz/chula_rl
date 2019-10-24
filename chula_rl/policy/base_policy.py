@@ -2,6 +2,7 @@ import random
 
 
 class BasePolicy:
+    """policy and outputs to a single env"""
     def step(self, state):
         raise NotImplementedError()
 

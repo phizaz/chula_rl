@@ -3,13 +3,14 @@ import gym
 import numpy as np
 
 
-class OneStepUniformReplay(BaseReplay):
+class VecOneStepUniformReplay(BaseReplay):
     """a wrapper for one-step explorer, this will put the experience into a database, then samples as a return"""
-    def __init__(self, explorer, n_sample, n_max_size, obs_space: gym.Space,
-                 act_space: gym.Space):
+    def __init__(self, explorer, n_sample, n_max_size, n_env,
+                 obs_space: gym.Space, act_space: gym.Space):
         super().__init__(explorer)
         self.n_sample = n_sample
         self.n_max_size = n_max_size
+        self.n_env = n_env
         self.obs_space = obs_space
         self.act_space = act_space
 
@@ -18,12 +19,12 @@ class OneStepUniformReplay(BaseReplay):
         # index
         self.i = 0
         # data
-        s_shape = [self.n_max_size] + list(obs_space.shape)
+        s_shape = [self.n_max_size, self.n_env] + list(obs_space.shape)
         self.s = np.zeros(s_shape, dtype=obs_space.dtype)
-        a_shape = [self.n_max_size] + list(act_space.shape)
+        a_shape = [self.n_max_size, self.n_env] + list(act_space.shape)
         self.a = np.zeros(a_shape, dtype=act_space.dtype)
-        self.r = np.zeros([self.n_max_size], dtype=np.float32)
-        self.done = np.zeros([self.n_max_size], dtype=bool)
+        self.r = np.zeros([self.n_max_size, self.n_env], dtype=np.float32)
+        self.done = np.zeros([self.n_max_size, self.n_env], dtype=bool)
         self.extra = {}
 
     def get_stats(self):
@@ -33,7 +34,7 @@ class OneStepUniformReplay(BaseReplay):
 
     def sample(self, n_sample):
         """sample from replay for n_sample size"""
-        # -1; to make sure you have the "next" state and action
+        # -1 to make sure you have the "next" state and action
         assert self.n > 0
         if self.n <= self.n_max_size:
             idx = np.random.choice(self.n - 1, n_sample, replace=True)
@@ -73,9 +74,9 @@ class OneStepUniformReplay(BaseReplay):
         self.n += 1
 
     def step(self, policy):
+        """this wraps around the explorer, it does step, put data, sample"""
         exp = self.explorer.step(policy)
         self.put(exp)
-        # to make sure you have the next state
         if self.n > 1:
             data = self.sample(self.n_sample)
         else:

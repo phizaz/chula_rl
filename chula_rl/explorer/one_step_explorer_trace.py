@@ -4,22 +4,21 @@ import numpy as np
 
 import gym
 from chula_rl.policy.base_policy import BasePolicy
-from chula_rl.exception import InteractionExceeded
+from chula_rl.exception import *
 
 from .base_explorer import BaseExplorer
 
 
-class OneStepExplorer(BaseExplorer):
-    """explore for an one-step"""
-    def __init__(self,
-                 n_max_interaction: int,
-                 env: gym.Env,
-                 use_final_a: bool = False):
+class OneStepExplorerWithTrace(BaseExplorer):
+    """one-step explorer but with n-step trace"""
+
+    def __init__(self, n_step: int, n_max_interaction: int, env: gym.Env):
         super().__init__(env)
+        self.n_step = n_step
         self.n_max_interaction = n_max_interaction
-        self.use_final_a = use_final_a
 
         self.last_s = self.env.reset()
+        self.trace = defaultdict(lambda: deque(maxlen=n_step))
 
         self.n_interaction = 0
         self.n_ep = 0
@@ -33,16 +32,13 @@ class OneStepExplorer(BaseExplorer):
         s, r, done, info = self.env.step(a)
         self.n_interaction += 1
 
-        data = {
-            's': self.last_s,
-            'a': a,
-            'r': r,
-            'ss': s,
-            'done': done,
-        }
-        # for SARSA
-        if self.use_final_a:
-            data['aa'] = policy.step(s)
+        # collect data
+        self.trace['s'].append(self.last_s)
+        self.trace['a'].append(a)
+        self.trace['r'].append(r)
+        self.trace['done'].append(done)
+        self.trace['final_s'] = s  # for bootstrapping
+        self.trace['final_a'] = policy.step(s)  # for SARSA
 
         self.last_s = s
 
@@ -52,4 +48,4 @@ class OneStepExplorer(BaseExplorer):
             self.n_ep += 1
             self._update_stats(self.n_interaction, info['episode']['reward'])
 
-        return data
+        return self.trace

@@ -103,9 +103,9 @@ class Gridworld(Env):
         #return s',r, done or not
         return (np.array((self.i, self.j)), reward, self.done, {})
 
-    def render(self, mode='human', figsize=(4, 2)):
+    def render(self, mode='human'):
         assert mode == 'human'
-        fig, axes = plt.subplots(1, 2, figsize=figsize)
+        fig, axes = plt.subplots(1, 2, figsize=(10, 5))
         self._print_physical(axes[0])
         self._print_reward(axes[1])
 

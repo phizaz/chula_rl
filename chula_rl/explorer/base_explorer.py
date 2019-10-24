@@ -7,20 +7,21 @@ from collections import defaultdict, deque
 
 
 class BaseExplorer:
-    def __init__(self, env: gym.Env):
+    def __init__(self, env: gym.Env, n_return_avg: int = 100):
         self.env = env
 
         self.hist = defaultdict(list)
-        self.mean_return = deque(maxlen=10)
+        self.mean_return = deque(maxlen=n_return_avg)
 
     def get_stats(self):
         # reward means total reward of an episode
         rewards = np.array(self.mean_return)
         return {
-            'reward': rewards.mean() if len(rewards) > 0 else 0.0,
-            'reward:q1':
+            'explorer/reward':
+            rewards.mean() if len(rewards) > 0 else 0.0,
+            'explorer/reward:q1':
             np.quantile(rewards, q=0.1) if len(rewards) > 0 else 0.0,
-            'reward:q9':
+            'explorer/reward:q9':
             np.quantile(rewards, q=0.9) if len(rewards) > 0 else 0.0,
         }
 

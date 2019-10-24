@@ -3,7 +3,7 @@ import random
 from chula_rl.policy.base_policy import BasePolicyWrapper
 
 
-class EpsilonGreedy(BasePolicyWrapper):
+class EpsilonRandom(BasePolicyWrapper):
     def __init__(self, policy, eps: float, n_action: int):
         super().__init__(policy)
         self.eps = eps
