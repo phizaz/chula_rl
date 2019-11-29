@@ -5,9 +5,12 @@ import time
 env = Santorini()
 start_time = time.time()
 state = env.reset()
-for i_act in range(1000):
+n = 10000
+for i_act in range(n):
     actions = env.legal_moves()
     if len(actions) == 0:
+        env.reset()
+        continue
         print('no action')
         print('current:', env.current_player)
         print(state_array(env._state))
@@ -17,4 +20,4 @@ for i_act in range(1000):
     if done:
         env.reset()
 end_time = time.time()
-print((end_time - start_time) / 1000, 'seconds')
+print((end_time - start_time) / n, 'seconds')

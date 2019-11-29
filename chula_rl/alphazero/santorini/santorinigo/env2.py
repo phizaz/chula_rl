@@ -1,4 +1,5 @@
 import numpy as np
+from numba import njit
 
 
 class Santorini:
@@ -65,20 +66,11 @@ class Santorini:
 
             mdir = self.ktoc[mdir]
             bdir = self.ktoc[bdir]
-            walkable, moved = _walkable(wid,
-                                        mdir,
-                                        workers=self._workers,
-                                        board=self._board)
-            if walkable:
-                others = np.array(
-                    [v for k, v in enumerate(self._workers) if k != wid])
-                buildable, part, built = _buildable(moved,
-                                                    bdir,
-                                                    others=others,
-                                                    board=self._board,
-                                                    parts=self._parts)
-                if buildable:
-                    out.append(i)
+            correct, moved, built, part = _check(wid, mdir, bdir,
+                                                 self._workers, self._board,
+                                                 self._parts)
+            if correct:
+                out.append(i)
         return out
 
     def step(self, action):
@@ -91,34 +83,22 @@ class Santorini:
 
         mdir = self.ktoc[mdir]
         bdir = self.ktoc[bdir]
-        walkable, moved = _walkable(wid,
-                                    mdir,
-                                    workers=self._workers,
-                                    board=self._board)
-        if walkable:
-            others = np.array(
-                [v for k, v in enumerate(self._workers) if k != wid])
-            buildable, part, built = _buildable(moved,
-                                                bdir,
-                                                others=others,
-                                                board=self._board,
-                                                parts=self._parts)
-            if buildable:
-                # move
-                self._workers[wid] = moved
-                # build
-                if part != -1:
-                    self._board[built[0], built[1]] = part
-                    self._parts[part] -= 1
-                # if win (standing on the third floor)
-                if self._board[moved[0], moved[1]] == self.winning_floor:
-                    reward = 1.
-                    done = True
-                else:
-                    reward = 0.
-                    done = False
+        correct, moved, built, part = _check(wid, mdir, bdir, self._workers,
+                                             self._board, self._parts)
+        if correct:
+            # move
+            self._workers[wid] = moved
+            # build
+            if part != -1:
+                self._board[built[0], built[1]] = part
+                self._parts[part] -= 1
+            # if win (standing on the third floor)
+            if self._board[moved[0], moved[1]] == self.winning_floor:
+                reward = 1.
+                done = True
             else:
-                raise ValueError('illegal move')
+                reward = 0.
+                done = False
         else:
             raise ValueError('illegal move')
 
@@ -146,11 +126,7 @@ def state_array(state):
     return np.stack([board, w_board, p_board])
 
 
-from numba import njit
-import numba as nb
-
-
-# @njit
+@njit
 def _walkable(
         wid: int,
         dir: np.ndarray,
@@ -185,11 +161,12 @@ def _walkable(
     return True, pos
 
 
-# @njit
+@njit
 def _buildable(
         src: np.ndarray,
         dir: np.ndarray,
-        others: np.ndarray,
+        wid: int,
+        workers: np.ndarray,
         board: np.ndarray,
         parts: np.ndarray,
 ):
@@ -207,10 +184,11 @@ def _buildable(
     if tgt == 4: return False, part, pos
 
     # no other worker
-    for i in range(len(others)):
-        oth = others[i]
-        if oth[0] == new[0] and oth[1] == new[1]:
-            return False, part, pos
+    for i in range(len(workers)):
+        if i != wid:
+            oth = workers[i]
+            if oth[0] == new[0] and oth[1] == new[1]:
+                return False, part, pos
 
     # check parts
     part = tgt + 1
@@ -221,6 +199,7 @@ def _buildable(
     return True, part, pos
 
 
+@njit
 def _check(
         wid: int,
         mdir: np.ndarray,
@@ -229,17 +208,14 @@ def _check(
         board: np.ndarray,
         parts: np.ndarray,
 ):
-    walkable, moved = _walkable(wid,
-                                mdir,
-                                workers=self._workers,
-                                board=self._board)
+    walkable, moved = _walkable(wid, mdir, workers=workers, board=board)
     if walkable:
-        others = np.array([v for k, v in enumerate(self._workers) if k != wid])
         buildable, part, built = _buildable(moved,
                                             bdir,
-                                            others=others,
-                                            board=self._board,
-                                            parts=self._parts)
-        return True, moved, built, part
-    else:
-        return False
+                                            wid=wid,
+                                            workers=workers,
+                                            board=board,
+                                            parts=parts)
+        if buildable:
+            return True, moved, built, part
+    return False, None, None, None
