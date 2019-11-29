@@ -55,56 +55,6 @@ class Santorini:
             'parts': self._parts,
         }
 
-    def _walkable(self, wid: int, dir: np.ndarray):
-        others, pos = None, None
-        # check boundary
-        src = self._workers[wid]
-        new = src + dir
-        if not (0 <= new[0] < self.board_dim[0]): return False, others, pos
-        if not (0 <= new[1] < self.board_dim[1]): return False, others, pos
-
-        # not a dome
-        tgt = self._board[new[0], new[1]]
-        if tgt == 4: return False, others, pos
-
-        # not too high
-        cur = self._board[src[0], src[1]]
-        if tgt > cur + 1: return False, others, pos
-
-        # no other worker
-        others = [v for k, v in enumerate(self._workers) if k != wid]
-        for pos in others:
-            if np.array_equal(pos, new): return False, others, pos
-
-        # return
-        pos = new
-        return True, others, pos
-
-    def _buildable(self, src, dir, workers: list):
-        part = None
-        pos = None
-
-        # check boundary
-        new = src + dir
-        if not (0 <= new[0] < self.board_dim[0]): return False, part, pos
-        if not (0 <= new[1] < self.board_dim[1]): return False, part, pos
-
-        # not a dome
-        tgt = self._board[new[0], new[1]]
-        if tgt == 4: return False, part, pos
-
-        # no other worker
-        for pos in workers:
-            if np.array_equal(pos, new): return False, part, pos
-
-        # check parts
-        part = tgt + 1
-        if self._parts[part] == 0: part = -1  # move without building
-
-        # return
-        pos = new
-        return True, part, pos
-
     def legal_moves(self):
         # all possbile moves
         out = []
@@ -115,9 +65,18 @@ class Santorini:
 
             mdir = self.ktoc[mdir]
             bdir = self.ktoc[bdir]
-            walkable, others, moved = self._walkable(wid, mdir)
+            walkable, moved = _walkable(wid,
+                                        mdir,
+                                        workers=self._workers,
+                                        board=self._board)
             if walkable:
-                buildable, part, built = self._buildable(moved, bdir, others)
+                others = np.array(
+                    [v for k, v in enumerate(self._workers) if k != wid])
+                buildable, part, built = _buildable(moved,
+                                                    bdir,
+                                                    others=others,
+                                                    board=self._board,
+                                                    parts=self._parts)
                 if buildable:
                     out.append(i)
         return out
@@ -132,9 +91,18 @@ class Santorini:
 
         mdir = self.ktoc[mdir]
         bdir = self.ktoc[bdir]
-        walkable, others, moved = self._walkable(wid, mdir)
+        walkable, moved = _walkable(wid,
+                                    mdir,
+                                    workers=self._workers,
+                                    board=self._board)
         if walkable:
-            buildable, part, built = self._buildable(moved, bdir, others)
+            others = np.array(
+                [v for k, v in enumerate(self._workers) if k != wid])
+            buildable, part, built = _buildable(moved,
+                                                bdir,
+                                                others=others,
+                                                board=self._board,
+                                                parts=self._parts)
             if buildable:
                 # move
                 self._workers[wid] = moved
@@ -176,3 +144,102 @@ def state_array(state):
         p_board[i, i] = p
 
     return np.stack([board, w_board, p_board])
+
+
+from numba import njit
+import numba as nb
+
+
+# @njit
+def _walkable(
+        wid: int,
+        dir: np.ndarray,
+        workers: np.ndarray,
+        board: np.ndarray,
+):
+    pos = None
+    # check boundary
+    src = workers[wid]
+    new = src + dir
+    board_dim = board.shape
+    if not (0 <= new[0] < board_dim[0]): return False, pos
+    if not (0 <= new[1] < board_dim[1]): return False, pos
+
+    # not a dome
+    tgt = board[new[0], new[1]]
+    if tgt == 4: return False, pos
+
+    # not too high
+    cur = board[src[0], src[1]]
+    if tgt > cur + 1: return False, pos
+
+    # no other worker
+    for i in range(len(workers)):
+        if i != wid:
+            oth = workers[i]
+            if oth[0] == new[0] and oth[1] == new[1]:
+                return False, pos
+
+    # return
+    pos = new
+    return True, pos
+
+
+# @njit
+def _buildable(
+        src: np.ndarray,
+        dir: np.ndarray,
+        others: np.ndarray,
+        board: np.ndarray,
+        parts: np.ndarray,
+):
+    part = None
+    pos = None
+
+    # check boundary
+    new = src + dir
+    board_dim = board.shape
+    if not (0 <= new[0] < board_dim[0]): return False, part, pos
+    if not (0 <= new[1] < board_dim[1]): return False, part, pos
+
+    # not a dome
+    tgt = board[new[0], new[1]]
+    if tgt == 4: return False, part, pos
+
+    # no other worker
+    for i in range(len(others)):
+        oth = others[i]
+        if oth[0] == new[0] and oth[1] == new[1]:
+            return False, part, pos
+
+    # check parts
+    part = tgt + 1
+    if parts[tgt + 1] == 0: part = -1  # move without building
+
+    # return
+    pos = new
+    return True, part, pos
+
+
+def _check(
+        wid: int,
+        mdir: np.ndarray,
+        bdir: np.ndarray,
+        workers: np.ndarray,
+        board: np.ndarray,
+        parts: np.ndarray,
+):
+    walkable, moved = _walkable(wid,
+                                mdir,
+                                workers=self._workers,
+                                board=self._board)
+    if walkable:
+        others = np.array([v for k, v in enumerate(self._workers) if k != wid])
+        buildable, part, built = _buildable(moved,
+                                            bdir,
+                                            others=others,
+                                            board=self._board,
+                                            parts=self._parts)
+        return True, moved, built, part
+    else:
+        return False
