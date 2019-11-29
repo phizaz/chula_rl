@@ -4,6 +4,8 @@ from numba import njit
 
 class Santorini:
     """
+    A fast reimplement version of Santorini. 
+
     Args:
         auto_invert: all players will always see -1, -2 as their workers, useful for self playing
     """

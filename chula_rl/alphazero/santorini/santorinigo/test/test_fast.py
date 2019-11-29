@@ -38,8 +38,14 @@ env2 = Santorini2()
 verify = Verify(env, env2)
 
 state = verify.reset()
-for i_act in range(1000):
+
+from tqdm import tqdm
+
+for i_act in tqdm(range(10_000)):
     actions = verify.legal_moves()
+    if len(actions) == 0:
+        verify.reset()
+        continue
     a = random.choice(actions)
     s, r, done, info = verify.step(a)
     if done:
