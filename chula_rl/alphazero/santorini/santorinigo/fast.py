@@ -3,13 +3,19 @@ from numba import njit
 
 
 class Santorini:
+    """
+    Args:
+        auto_invert: all players will always see -1, -2 as their workers, useful for self playing
+    """
     def __init__(self,
                  board_dim=(5, 5),
                  starting_parts=np.array([0, 22, 18, 14, 18]),
-                 winning_floor=3):
+                 winning_floor=3,
+                 auto_invert: bool = False):
         self.board_dim = board_dim
         self.starting_parts = starting_parts
         self.winning_floor = winning_floor
+        self.auto_invert = auto_invert
 
         self.moves = ['q', 'w', 'e', 'a', 'd', 'z', 'x', 'c']
         self.builds = ['q', 'w', 'e', 'a', 'd', 'z', 'x', 'c']
@@ -30,9 +36,33 @@ class Santorini:
                      for b in self.builds]
         # action to index
         self.atoi = {action: index for index, action in enumerate(self.itoa)}
+        # worker ot index
         self.wtoi = {-1: 0, -2: 1, 1: 2, 2: 3}
 
+        # cache the legal move query
+        self._legal_move_cache = None
+
         self.reset()
+
+    def set_state(self, board, workers, parts, current_player, done):
+        """set the env to a specific point in time, useful for planning"""
+        # note: reset will also clear the cache
+        self.reset()
+        self._board = board
+        self._workers = workers
+        self._parts = parts
+        self.current_player = current_player
+        self._done = done
+
+    def get_state(self):
+        """this state is used only for save and load"""
+        return {
+            'board': self._board,
+            'workers': self._workers,
+            'parts': self._parts,
+            'current_player': self.current_player,
+            'done': self._done,
+        }
 
     def reset(self):
         self.current_player = -1
@@ -45,33 +75,47 @@ class Santorini:
         ])
         self._board = np.zeros(self.board_dim, dtype=np.int64)
         self._done = False
-        return self._state
+        # invalidate the cache
+        self._legal_move_cache = None
+        return self._state()
 
-    @property
     def _state(self):
-        return {
-            'board': self._board,
-            'workers': {k: v
-                        for k, v in zip(self.wtoi.keys(), self._workers)},
-            'parts': self._parts,
-        }
+        workers = {k: v for k, v in zip(self.wtoi.keys(), self._workers)}
+        w_board = np.zeros_like(self._board)
+        for k, v in workers.items():
+            w_board[tuple(v)] = k
+
+        if self.auto_invert:
+            # auto invert the worker number
+            # so that each player will see themselves playing -1, -2 workers
+            w_board = -self.current_player * w_board
+
+        p_board = np.zeros_like(self._board)
+        for i, p in enumerate(self._parts):
+            p_board[i, i] = p
+
+        return np.stack([self._board, w_board, p_board])
 
     def legal_moves(self):
-        # all possbile moves
-        out = []
-        for i, (worker, mdir, bdir) in enumerate(self.itoa):
-            # invert worker's number if needed
-            worker = self.current_player * abs(worker)
-            wid = self.wtoi[worker]
+        """get possible moves"""
+        if self._legal_move_cache is None:
+            # all possbile moves
+            out = []
+            for i, (worker, mdir, bdir) in enumerate(self.itoa):
+                # the worker sign is not important
+                # we use the sign from the current player
+                worker = self.current_player * abs(worker)
+                wid = self.wtoi[worker]
 
-            mdir = self.ktoc[mdir]
-            bdir = self.ktoc[bdir]
-            correct, moved, built, part = _check(wid, mdir, bdir,
-                                                 self._workers, self._board,
-                                                 self._parts)
-            if correct:
-                out.append(i)
-        return out
+                mdir = self.ktoc[mdir]
+                bdir = self.ktoc[bdir]
+                correct, moved, built, part = _check(wid, mdir, bdir,
+                                                     self._workers,
+                                                     self._board, self._parts)
+                if correct:
+                    out.append(i)
+            self._legal_move_cache = out
+        return self._legal_move_cache
 
     def step(self, action):
         assert not self._done, "must reset"
@@ -88,7 +132,7 @@ class Santorini:
         if correct:
             # move
             self._workers[wid] = moved
-            # build
+            # build and decrease the part count
             if part != -1:
                 self._board[built[0], built[1]] = part
                 self._parts[part] -= 1
@@ -102,28 +146,23 @@ class Santorini:
         else:
             raise ValueError('illegal move')
 
-        self._done = done
-
         # switch the player
         self.current_player *= -1
+        # invalidate the cache
+        # only when the player changes, after step
+        self._legal_move_cache = None
 
-        return self._state, reward, done, {}
+        # check if the next player is not possible to move
+        # the previous wins
+        # note: must switch the player first
+        # the legal move can be "reused" (as a cache) for the next legal move query
+        if len(self.legal_moves()) == 0:
+            reward = 1.
+            done = True
 
-
-def state_array(state):
-    board = state['board']
-    workers = state['workers']
-    parts = state['parts']
-
-    w_board = np.zeros_like(board)
-    for k, v in workers.items():
-        w_board[tuple(v)] = k
-
-    p_board = np.zeros_like(board)
-    for i, p in enumerate(parts):
-        p_board[i, i] = p
-
-    return np.stack([board, w_board, p_board])
+        self._done = done
+        # state is the next state (that is for the next player)
+        return self._state(), reward, done, {}
 
 
 @njit
@@ -133,6 +172,7 @@ def _walkable(
         workers: np.ndarray,
         board: np.ndarray,
 ):
+    """check if the move is valid"""
     pos = None
     # check boundary
     src = workers[wid]
@@ -170,6 +210,7 @@ def _buildable(
         board: np.ndarray,
         parts: np.ndarray,
 ):
+    """check if the build is valid"""
     part = None
     pos = None
 
@@ -199,7 +240,6 @@ def _buildable(
     return True, part, pos
 
 
-@njit
 def _check(
         wid: int,
         mdir: np.ndarray,

@@ -1,4 +1,4 @@
-from chula_rl.alphazero.santorini.santorinigo.env2 import Santorini, state_array
+from chula_rl.alphazero.santorini.santorinigo.fast import Santorini
 import random
 import time
 
@@ -13,7 +13,6 @@ for i_act in range(n):
         continue
         print('no action')
         print('current:', env.current_player)
-        print(state_array(env._state))
         break
     a = random.choice(actions)
     s, r, done, info = env.step(a)

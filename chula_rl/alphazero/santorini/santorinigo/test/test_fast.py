@@ -1,4 +1,4 @@
-from chula_rl.alphazero.santorini.santorinigo.env2 import Santorini as Santorini2, state_array
+from chula_rl.alphazero.santorini.santorinigo.fast import Santorini as Santorini2
 from chula_rl.alphazero.santorini.santorinigo.environment import Santorini
 import random
 import time
@@ -12,7 +12,7 @@ class Verify:
 
     def reset(self):
         e1 = self.env.reset()
-        e2 = state_array(self.env2.reset())
+        e2 = self.env2.reset()
         assert np.array_equal(e1, e2)
         return e1
 
@@ -26,7 +26,6 @@ class Verify:
     def step(self, a):
         s1, r1, d1, i1 = self.env.step(a)
         s2, r2, d2, _ = self.env2.step(a)
-        s2 = state_array(s2)
         assert np.array_equal(s1, s2)
         assert r1 == r2, f'r1 {r1} != r2 {r2}'
         assert d1 == d2, f'd1 {d1} != d2 {d2}'
