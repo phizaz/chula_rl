@@ -29,18 +29,19 @@ class Santorini:
                      for b in self.builds]
         # action to index
         self.atoi = {action: index for index, action in enumerate(self.itoa)}
+        self.wtoi = {-1: 0, -2: 1, 1: 2, 2: 3}
 
         self.reset()
 
     def reset(self):
         self.current_player = -1
         self._parts = self.starting_parts.copy()
-        self._w_pos = {
-            -1: np.array((0, 2)),
-            -2: np.array((4, 2)),
-            1: np.array((2, 0)),
-            2: np.array((2, 4)),
-        }
+        self._workers = np.array([
+            (0, 2),
+            (4, 2),
+            (2, 0),
+            (2, 4),
+        ])
         self._board = np.zeros(self.board_dim, dtype=np.int64)
         self._done = False
         return self._state
@@ -49,57 +50,60 @@ class Santorini:
     def _state(self):
         return {
             'board': self._board,
-            'workers': self._w_pos,
+            'workers': {k: v
+                        for k, v in zip(self.wtoi.keys(), self._workers)},
             'parts': self._parts,
         }
 
-    def _walkable(self, worker, dir, output: dict):
+    def _walkable(self, wid: int, dir: np.ndarray):
+        others, pos = None, None
         # check boundary
-        src = self._w_pos[worker]
+        src = self._workers[wid]
         new = src + dir
-        if not (0 <= new[0] < self.board_dim[0]): return False
-        if not (0 <= new[1] < self.board_dim[1]): return False
+        if not (0 <= new[0] < self.board_dim[0]): return False, others, pos
+        if not (0 <= new[1] < self.board_dim[1]): return False, others, pos
 
         # not a dome
-        tgt = self._board[tuple(new)]
-        if tgt == 4: return False
+        tgt = self._board[new[0], new[1]]
+        if tgt == 4: return False, others, pos
 
         # not too high
-        cur = self._board[tuple(src)]
-        if tgt > cur + 1: return False
+        cur = self._board[src[0], src[1]]
+        if tgt > cur + 1: return False, others, pos
 
         # no other worker
-        others = [v for k, v in self._w_pos.items() if k != worker]
+        others = [v for k, v in enumerate(self._workers) if k != wid]
         for pos in others:
-            if np.array_equal(pos, new): return False
+            if np.array_equal(pos, new): return False, others, pos
 
         # return
-        output['workers'] = others
-        output['pos'] = new
-        return True
+        pos = new
+        return True, others, pos
 
-    def _buildable(self, src, dir, workers: list, output: dict):
+    def _buildable(self, src, dir, workers: list):
+        part = None
+        pos = None
+
         # check boundary
         new = src + dir
-        if not (0 <= new[0] < self.board_dim[0]): return False
-        if not (0 <= new[1] < self.board_dim[1]): return False
+        if not (0 <= new[0] < self.board_dim[0]): return False, part, pos
+        if not (0 <= new[1] < self.board_dim[1]): return False, part, pos
 
         # not a dome
-        tgt = self._board[tuple(new)]
-        if tgt == 4: return False
+        tgt = self._board[new[0], new[1]]
+        if tgt == 4: return False, part, pos
 
         # no other worker
         for pos in workers:
-            if np.array_equal(pos, new): return False
+            if np.array_equal(pos, new): return False, part, pos
 
         # check parts
         part = tgt + 1
-        if self._parts[part] > 0: output['part'] = part
-        else: output['part'] = -1
+        if self._parts[part] == 0: part = -1  # move without building
 
         # return
-        output['pos'] = new
-        return True
+        pos = new
+        return True, part, pos
 
     def legal_moves(self):
         # all possbile moves
@@ -107,12 +111,14 @@ class Santorini:
         for i, (worker, mdir, bdir) in enumerate(self.itoa):
             # invert worker's number if needed
             worker = self.current_player * abs(worker)
+            wid = self.wtoi[worker]
 
             mdir = self.ktoc[mdir]
             bdir = self.ktoc[bdir]
-            m = {}
-            if self._walkable(worker, mdir, m):
-                if self._buildable(m['pos'], bdir, m['workers'], {}):
+            walkable, others, moved = self._walkable(wid, mdir)
+            if walkable:
+                buildable, part, built = self._buildable(moved, bdir, others)
+                if buildable:
                     out.append(i)
         return out
 
@@ -122,21 +128,22 @@ class Santorini:
 
         # invert worker's number if needed
         worker = self.current_player * abs(worker)
+        wid = self.wtoi[worker]
 
         mdir = self.ktoc[mdir]
         bdir = self.ktoc[bdir]
-        m = {}
-        if self._walkable(worker, mdir, m):
-            b = {}
-            if self._buildable(m['pos'], bdir, m['workers'], b):
+        walkable, others, moved = self._walkable(wid, mdir)
+        if walkable:
+            buildable, part, built = self._buildable(moved, bdir, others)
+            if buildable:
                 # move
-                self._w_pos[worker] = m['pos']
+                self._workers[wid] = moved
                 # build
-                if b['part'] != -1:
-                    self._board[tuple(b['pos'])] = b['part']
-                    self._parts[b['part']] -= 1
+                if part != -1:
+                    self._board[built[0], built[1]] = part
+                    self._parts[part] -= 1
                 # if win (standing on the third floor)
-                if self._board[tuple(m['pos'])] == self.winning_floor:
+                if self._board[moved[0], moved[1]] == self.winning_floor:
                     reward = 1.
                     done = True
                 else:
