@@ -8,16 +8,24 @@ class Santorini:
 
     Args:
         auto_invert: all players will always see -1, -2 as their workers, useful for self playing
+        superpower: whether to enable superpowers
+        n_win_dome: who puts the n-th dome wins (with superpower enabled)
     """
-    def __init__(self,
-                 board_dim=(5, 5),
-                 starting_parts=np.array([0, 22, 18, 14, 18]),
-                 winning_floor=3,
-                 auto_invert: bool = False):
+    def __init__(
+            self,
+            board_dim=(5, 5),
+            starting_parts=np.array([0, 22, 18, 14, 18]),
+            winning_floor=3,
+            auto_invert: bool = False,
+            superpower: bool = False,
+            n_win_dome: int = 5,
+    ):
         self.board_dim = board_dim
         self.starting_parts = starting_parts
         self.winning_floor = winning_floor
         self.auto_invert = auto_invert
+        self.superpower = superpower
+        self.n_win_dome = n_win_dome
 
         self.moves = ['q', 'w', 'e', 'a', 'd', 'z', 'x', 'c']
         self.builds = ['q', 'w', 'e', 'a', 'd', 'z', 'x', 'c']
@@ -142,19 +150,25 @@ class Santorini:
         correct, moved, built, part = _check(wid, mdir, bdir, self._workers,
                                              self._board, self._parts)
         if correct:
+            reward, done = 0., False
             # move
             self._workers[wid] = moved
             # build and decrease the part count
             if part != -1:
                 self._board[built[0], built[1]] = part
                 self._parts[part] -= 1
+                # superpower
+                # the player who puts the n-th dome wins
+                if self.superpower:
+                    n_dome = (self._board == 4).sum()
+                    if n_dome == self.n_win_dome:
+                        reward = 1.
+                        done = True
+
             # if win (standing on the third floor)
             if self._board[moved[0], moved[1]] == self.winning_floor:
                 reward = 1.
                 done = True
-            else:
-                reward = 0.
-                done = False
         else:
             raise ValueError('illegal move')
 

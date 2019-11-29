@@ -2,7 +2,7 @@ from chula_rl.alphazero.santorini.santorinigo.fast import Santorini
 import random
 import time
 
-env = Santorini()
+env = Santorini(superpower=False)
 start_time = time.time()
 state = env.reset()
 n = 10000
