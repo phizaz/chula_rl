@@ -97,7 +97,10 @@ class Santorini:
         return np.stack([self._board, w_board, p_board])
 
     def legal_moves(self):
-        """get possible moves"""
+        """get possible moves
+        Returns:
+            list of move indexes (int)
+        """
         if self._legal_move_cache is None:
             # all possbile moves
             out = []
@@ -105,10 +108,9 @@ class Santorini:
                 # the worker sign is not important
                 # we use the sign from the current player
                 worker = self.current_player * abs(worker)
-                wid = self.wtoi[worker]
-
-                mdir = self.ktoc[mdir]
-                bdir = self.ktoc[bdir]
+                wid = self.wtoi[worker]  # worker id
+                mdir = self.ktoc[mdir]  # move direction
+                bdir = self.ktoc[bdir]  # build direction
                 correct, moved, built, part = _check(wid, mdir, bdir,
                                                      self._workers,
                                                      self._board, self._parts)
@@ -118,13 +120,21 @@ class Santorini:
         return self._legal_move_cache
 
     def step(self, action):
+        """
+        Returns:
+            (next state, reward, done, _)
+            next state: array [3, 5, 5]; 
+                        0: board, 1: workers, 2: part counts
+            reward: 1 or 0, 1 if the player (who takes the action) wins
+            done: True or False
+        """
         assert not self._done, "must reset"
         worker, mdir, bdir = self.itoa[action]
 
-        # invert worker's number if needed
+        # the worker sign is not important
+        # we use the sign from the current player
         worker = self.current_player * abs(worker)
         wid = self.wtoi[worker]
-
         mdir = self.ktoc[mdir]
         bdir = self.ktoc[bdir]
         correct, moved, built, part = _check(wid, mdir, bdir, self._workers,
@@ -248,6 +258,7 @@ def _check(
         board: np.ndarray,
         parts: np.ndarray,
 ):
+    """check movable and buildable"""
     walkable, moved = _walkable(wid, mdir, workers=workers, board=board)
     if walkable:
         buildable, part, built = _buildable(moved,
