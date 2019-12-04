@@ -98,6 +98,7 @@ class Santorini:
         if self.auto_invert:
             # auto invert the worker number
             # so that each player will see themselves playing -1, -2 workers
+            # note: this does not change the underlying data
             w_board = -self.current_player * w_board
 
         p_board = np.zeros_like(self._board)
@@ -111,6 +112,7 @@ class Santorini:
         Returns:
             list of move indexes (int)
         """
+        assert not self._done, "must reset"
         if self._legal_move_cache is None:
             # all possbile moves
             out = []
@@ -121,9 +123,14 @@ class Santorini:
                 wid = self.wtoi[worker]  # worker id
                 mdir = self.ktoc[mdir]  # move direction
                 bdir = self.ktoc[bdir]  # build direction
-                correct, moved, built, part = _check(wid, mdir, bdir,
-                                                     self._workers,
-                                                     self._board, self._parts)
+                correct, moved, built, part = _check(
+                    wid,
+                    mdir,
+                    bdir,
+                    workers=self._workers,
+                    board=self._board,
+                    parts=self._parts,
+                    winning_floor=self.winning_floor)
                 if correct:
                     out.append(i)
             self._legal_move_cache = out
@@ -147,14 +154,25 @@ class Santorini:
         wid = self.wtoi[worker]
         mdir = self.ktoc[mdir]
         bdir = self.ktoc[bdir]
-        correct, moved, built, part = _check(wid, mdir, bdir, self._workers,
-                                             self._board, self._parts)
+        correct, moved, built, part = _check(wid,
+                                             mdir,
+                                             bdir,
+                                             workers=self._workers,
+                                             board=self._board,
+                                             parts=self._parts,
+                                             winning_floor=self.winning_floor)
         if correct:
             reward, done = 0., False
             # move
             self._workers[wid] = moved
-            # build and decrease the part count
-            if part != -1:
+
+            # if win (standing on the third floor)
+            # note: on winning move, no building
+            if self._board[moved[0], moved[1]] == self.winning_floor:
+                reward = 1.
+                done = True
+            else:
+                # build and decrease the part count
                 self._board[built[0], built[1]] = part
                 self._parts[part] -= 1
                 # superpower
@@ -164,11 +182,6 @@ class Santorini:
                     if n_dome == self.n_win_dome:
                         reward = 1.
                         done = True
-
-            # if win (standing on the third floor)
-            if self._board[moved[0], moved[1]] == self.winning_floor:
-                reward = 1.
-                done = True
         else:
             raise ValueError('illegal move')
 
@@ -258,14 +271,16 @@ def _buildable(
                 return False, part, pos
 
     # check parts
+    # must be able to build
     part = tgt + 1
-    if parts[tgt + 1] == 0: part = -1  # move without building
+    if parts[tgt + 1] == 0: return False, part, pos
 
     # return
     pos = new
     return True, part, pos
 
 
+@njit
 def _check(
         wid: int,
         mdir: np.ndarray,
@@ -273,10 +288,18 @@ def _check(
         workers: np.ndarray,
         board: np.ndarray,
         parts: np.ndarray,
+        winning_floor: int,
 ):
-    """check movable and buildable"""
+    """check movable and buildable
+    Returns:
+        (is_valid, moved_position, built_position, built_part)
+    """
     walkable, moved = _walkable(wid, mdir, workers=workers, board=board)
     if walkable:
+        # moved and won, no check for building
+        if board[moved[0], moved[1]] == winning_floor:
+            return True, moved, None, None
+
         buildable, part, built = _buildable(moved,
                                             bdir,
                                             wid=wid,
