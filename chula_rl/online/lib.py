@@ -46,7 +46,8 @@ class Return:
 
 
 class Env:
-    def __init__(self, superpower):
+    def __init__(self, superpower, first_player=1):
+        self.first_player = first_player
         self.env = Santorini(auto_invert=True, superpower=superpower)
         self.q1 = Queue()
         self.q2 = Queue()
@@ -69,26 +70,31 @@ class Env:
         """
         rearrange the command sequence
         """
-        player = 1
+        player = self.first_player  # first player
         q = [None, self.q1, self.q2]
         states = [None, 'reset', 'reset']
         not_ret = None
         while True:
             op, a, ret = q[player].get()
+            # print(f'worker: player: {player} op: {op}')
             try:
                 assert op == states[
                     player], f'state {op} expects {states[player]}'
 
                 if op == 'reset':
-                    if player == 1:
+                    if player == self.first_player:
                         # first time case
                         s = self.env.reset()
                         legal_moves = self.env.legal_moves()
                         ret.set((s, None, None, None, legal_moves))
                         states[player] = 'step'
-                        player = 2
                     else:
                         states[player] = 'step'
+
+                    # switch player
+                    if player == 1:
+                        player = 2
+                    else:
                         player = 1
                     not_ret = ret
                 elif op == 'step':
@@ -129,8 +135,10 @@ class Env:
         ret = Return()
         cmd = ('reset', None, ret)
         if player == 1:
+            # print('put to player 1 queue')
             self.q1.put(cmd)
         elif player == 2:
+            # print('put to player 2 queue')
             self.q2.put(cmd)
         else:
             raise NotImplementedError()
@@ -156,19 +164,48 @@ def serializable(v):
 
 
 class Room:
-    def __init__(self, superpower):
-        self.env = Env(superpower=superpower)
-        self.tokens = [None, generate_token(), generate_token()]
+    """
+    Args:
+        next_room: the next room id; used by others to link the rooms together
+        first_player: who will be the first player (default 1)
+    """
+    def __init__(self,
+                 superpower,
+                 tokens=None,
+                 next_room: int = None,
+                 first_player: int = 1):
+        self.superpower = superpower
+        self.next_room = next_room
+        self.first_player = first_player
+        self.env = Env(superpower=superpower, first_player=first_player)
+        if tokens is None:
+            self.tokens = [None, generate_token(), generate_token()]
+        else:
+            # token is given with the booked rooms
+            # so that we can control for the access
+            self.tokens = tokens
+        # if token is given, needs token to reset (to start)
+        self._need_authen = tokens is not None
         self._reset_cnt = 0
 
-    def reset(self):
-        if self._reset_cnt == 0:
-            player = 1
+    def reset(self, token=None):
+        # print('room reset')
+        if self._need_authen:
+            # room requires authen
+            assert token is not None, 'this room requires authentication'
+            player = self.tokens.index(token)
         else:
-            player = 2
+            # room is open, first to come is the first player
+            if self._reset_cnt == 0:
+                # print('reset player 1')
+                player = 1
+            else:
+                # print('reset player 2')
+                player = 2
         self._reset_cnt += 1
         if self._reset_cnt > 2:
             raise Exception('the room has already started')
+
         value = self.env.reset(player).wait()
         if isinstance(value, Exception):
             raise value
@@ -177,7 +214,9 @@ class Room:
             'return': value[0],
             'legal_moves': value[4],
             'player': player,
+            'superpower': self.superpower,
             'token': self.tokens[player],
+            'next_room': self.next_room,
         }
 
     def step(self, a, token):
@@ -191,10 +230,89 @@ class Room:
             'return': value[:4],
             'legal_moves': value[4],
             'player': player,
+            'superpower': self.superpower,
             'token': self.tokens[player],
+            'next_room': self.next_room,
         }
 
 
 class Store:
     def __init__(self):
         self.rooms = dict()
+
+
+def generate_id(rooms: dict, max_id=10_000_000):
+    assert len(rooms) < max_id, "max_id is too low"
+    while True:
+        id = random.randint(0, max_id)
+        if id not in rooms:
+            return id
+
+
+def create_match(normal_games: int, superpower_games: int, first_room: int,
+                 rooms: dict):
+    # a match is a series of rooms with alteranting starters with and without
+    n = normal_games + superpower_games
+    assert n > 0
+
+    first = True
+
+    ids = []
+    room_seq = []
+
+    tokens = None
+
+    first_player = 1
+
+    # create normal rooms
+    for i in range(normal_games):
+        if first:
+            first = False
+            room_id = first_room
+        else:
+            # generate an id
+            room_id = generate_id(rooms)
+
+        rooms[room_id] = room = Room(superpower=False,
+                                     tokens=tokens,
+                                     first_player=first_player)
+        if first_player == 1:
+            first_player = 2
+        else:
+            first_player = 1
+
+        if tokens is None:
+            tokens = room.tokens
+
+        ids.append(room_id)
+        room_seq.append(room)
+
+    # create superpower rooms
+    for i in range(superpower_games):
+        if first:
+            first = False
+            room_id = first_room
+        else:
+            # generate an id
+            room_id = generate_id(rooms)
+
+        rooms[room_id] = room = Room(superpower=True,
+                                     tokens=tokens,
+                                     first_player=first_player)
+        if first_player == 1:
+            first_player = 2
+        else:
+            first_player = 1
+
+        if tokens is None:
+            tokens = room.tokens
+
+        ids.append(room_id)
+        room_seq.append(room)
+
+    # link them
+    for i in range(len(room_seq) - 1):
+        room_seq[i].next_room = ids[i + 1]
+
+    # return the first room
+    return room_seq[0]
