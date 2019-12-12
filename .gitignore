@@ -4,3 +4,4 @@ chula_rl.egg-info
 *.code-workspace
 .vscode
 runs
+tensorboard
