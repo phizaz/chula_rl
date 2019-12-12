@@ -156,17 +156,19 @@ def serializable(v):
 
 
 class Room:
-    def __init__(self):
-        self.env = Env(superpower=False)
+    def __init__(self, superpower):
+        self.env = Env(superpower=superpower)
         self.tokens = [None, generate_token(), generate_token()]
-        self.first = True
+        self._reset_cnt = 0
 
     def reset(self):
-        if self.first:
+        if self._reset_cnt == 0:
             player = 1
         else:
             player = 2
-        self.first = False
+        self._reset_cnt += 1
+        if self._reset_cnt > 2:
+            raise Exception('the room has already started')
         value = self.env.reset(player).wait()
         if isinstance(value, Exception):
             raise value
@@ -195,4 +197,4 @@ class Room:
 
 class Store:
     def __init__(self):
-        self.rooms = defaultdict(Room)
+        self.rooms = dict()

@@ -17,6 +17,10 @@ def hello():
 @app.route('/room/<int:room_id>/reset', methods=['POST'])
 def reset(room_id):
     with create_room_lock:
+        superpower = request.args.get('superpower', False)
+        if superpower is not False: superpower = True
+        if room_id not in store.rooms:
+            store.rooms[room_id] = Room(superpower=superpower)
         room = store.rooms[room_id]
         return jsonify(room.reset())
 
@@ -38,4 +42,4 @@ def value_exception(e):
 
 
 if __name__ == "__main__":
-    app.run('0.0.0.0', 5000, debug=False, threaded=True)
+    app.run('0.0.0.0', 5000, debug=True, threaded=True)
