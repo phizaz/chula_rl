@@ -3,3 +3,4 @@ chula_rl.egg-info
 .ipynb_checkpoints
 *.code-workspace
 .vscode
+runs
