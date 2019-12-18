@@ -55,6 +55,7 @@ class Env:
         self.worker.daemon = True
         self.worker.start()
         self.done = False
+        self.trace = Trace()
 
     def _exception(self, e):
         self.done = True
@@ -85,6 +86,8 @@ class Env:
                     if player == self.first_player:
                         # first time case
                         s = self.env.reset()
+                        # set trace
+                        self.trace.set_init(self.env)
                         legal_moves = self.env.legal_moves()
                         ret.set((s, None, None, None, legal_moves))
                         states[player] = 'step'
@@ -100,6 +103,8 @@ class Env:
                 elif op == 'step':
                     # handle error
                     s, r, done, info = self.env.step(a)
+                    # keep trace
+                    self.trace.step(a)
 
                     if done:
                         ret.set((s, r, done, info, []))
@@ -163,6 +168,21 @@ def serializable(v):
     return s, r, done, info, legal_moves
 
 
+class Trace:
+    def __init__(self):
+        self.args = None
+        self.steps = []
+
+    def set_init(self, env):
+        self.args = {
+            'auto_invert': env.auto_invert,
+            'superpower': env.superpower,
+        }
+
+    def step(self, a):
+        self.steps.append(a)
+
+
 class Room:
     """
     Args:
@@ -188,6 +208,10 @@ class Room:
         self._need_authen = tokens is not None
         self._reset_cnt = 0
 
+    @property
+    def trace(self):
+        return {'trace': self.env.trace.__dict__, 'next_room': self.next_room}
+
     def reset(self, token=None):
         # print('room reset')
         if self._need_authen:
@@ -207,6 +231,7 @@ class Room:
             raise Exception('the room has already started')
 
         value = self.env.reset(player).wait()
+
         if isinstance(value, Exception):
             raise value
         value = serializable(value)
@@ -223,6 +248,7 @@ class Room:
         player = self.tokens.index(token)
         assert player != -1, 'invalid token'
         value = self.env.step(a, player).wait()
+
         if isinstance(value, Exception):
             raise value
         value = serializable(value)

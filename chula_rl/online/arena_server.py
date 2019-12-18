@@ -14,6 +14,12 @@ def hello():
     return jsonify(sorted(list(store.rooms.keys())))
 
 
+@app.route('/room/<int:room_id>', methods=['get'])
+def get_trace(room_id):
+    room = store.rooms[room_id]
+    return jsonify(room.trace)
+
+
 @app.route('/room/<int:room_id>/reset', methods=['POST'])
 def reset(room_id):
     token = request.args.get('token', None)
@@ -22,7 +28,7 @@ def reset(room_id):
     superpower = request.args.get('superpower', False)
     if superpower is not False: superpower = True
 
-    print('token:', token)
+    # print('token:', token)
     # print('match:', play_match)
     # print('superpower:', superpower)
 
@@ -59,4 +65,4 @@ def value_exception(e):
 
 
 if __name__ == "__main__":
-    app.run('0.0.0.0', 5000, debug=False, threaded=True)
+    app.run('0.0.0.0', 5001, debug=True, threaded=True)
